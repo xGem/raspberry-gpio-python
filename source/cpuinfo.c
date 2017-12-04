@@ -34,6 +34,8 @@ int get_rpi_info(rpi_info *info)
    char *rev;
    int found = 0;
    int len;
+   char *line;
+   size_t linelen = 128;
 
    if ((fp = fopen("/proc/cpuinfo", "r")) == NULL)
       return -1;
@@ -51,8 +53,68 @@ int get_rpi_info(rpi_info *info)
    }
    fclose(fp);
 
-   if (!found)
+   if (!found) {
+   // We may have data from the device-tree
+   if ((fp = fopen("/proc/device-tree/compatible", "r")) != NULL) {
+      line = calloc(linelen, sizeof(char));
+      while (getdelim(&line, &linelen, '\0', fp) != -1) {
+         // Look for the board model
+         if (strstr(line, "raspberrypi,model-a")) {
+            info->type = "Model A";
+            info->p1_revision = 2;
+            info->ram = "256M";
+         } else if (strstr(line, "raspberrypi,model-b")) {
+            info->type = "Model B";
+            info->p1_revision = 2;
+            info->ram = "256M";
+         } else if (strstr(line, "raspberrypi,model-a-plus")) {
+            info->type = "Model A+";
+            info->p1_revision = 3;
+            info->ram = "Unknown";
+         } else if (strstr(line, "raspberrypi,model-b-plus")) {
+            info->type = "Model B+";
+            info->p1_revision = 3;
+            info->ram = "512M";
+         } else if (strstr(line, "raspberrypi,2-model-b")) {
+            info->type = "Pi 2 Model B";
+            info->p1_revision = 3;
+            info->ram = "1G";
+         } else if (strstr(line, "raspberrypi,compute-module")) {
+            info->type = "Compute";
+            info->p1_revision = 0;
+            info->ram = "512M";
+         } else if (strstr(line, "raspberrypi,3-model-b")) {
+            info->type = "Pi 3 Model B";
+            info->p1_revision = 3;
+            info->ram = "1G";
+         } else if (strstr(line, "raspberrypi,model-zero")) {
+            info->type = "Zero";
+            info->p1_revision = 3;
+            info->ram = "512M";
+         } else if (strstr(line, "raspberrypi,model-b-rev2")) {
+            info->type = "Model B";
+            info->p1_revision = 2;
+            info->ram = "Unknown";
+         }
+
+         // Look for CPU part
+         if (strstr(line, "brcm,bcm2835")) {
+   	        info->processor = "BCM2835";
+         } else if (strstr(line, "brcm,bcm2836")) {
+   	        info->processor = "BCM2836";
+         } else if (strstr(line, "brcm,bcm2837")) {
+   	        info->processor = "BCM2837";
+         }
+      }
+      free(line);
+
+      info->manufacturer = "Unknown";
+      fclose(fp);
+
+      return 0;
+   }
       return -1;
+   }
 
    if ((len = strlen(revision)) == 0)
       return -1;
